@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charging Predictor</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #2196F3, #03A9F4);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 400px;
+            margin: auto;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        input[type="number"] {
+            width: 95%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #0288D1;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0277BD;
+        }
+        .output {
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>iQube Charging Time Predictor</h1>
+    <div class="container">
+        <label for="battery-before">Battery % Before Charging:</label>
+        <input type="number" id="battery-before" min="0" max="100" placeholder="">
+        
+        <label for="energy-consumed">Energy Consumed (kWh):</label>
+        <input type="number" id="energy-consumed" min="0" step="0.01" placeholder="">
+
+        <button onclick="calculateCharging()">Predict Charging Status</button>
+
+        <div class="output" id="output"></div>
+    </div>
+
+    <script>
+        function calculateCharging() {
+            // Input values
+            const batteryBefore = parseFloat(document.getElementById('battery-before').value);
+            const energyConsumed = parseFloat(document.getElementById('energy-consumed').value) || 0.000001;
+            const power = 0.65; // Charger power in kW
+            const batteryCapacity = 3.4; // kWh
+
+            // Check for valid inputs
+            if (isNaN(batteryBefore) || batteryBefore < 0 || batteryBefore > 100) {
+                alert("Please enter a valid battery percentage between 0 and 100.");
+                return;
+            }
+
+            if (isNaN(energyConsumed) || energyConsumed < 0) {
+                alert("Please enter a valid energy consumed value.");
+                return;
+            }
+
+            // Step 1: Calculate how much battery percentage has been charged so far
+            const energyNeededFor20Percent = batteryCapacity * 0.2; // Energy needed for 20% charge
+            const percentageCharged = (energyConsumed / energyNeededFor20Percent) * 20; // Percentage charged
+
+            // Step 2: Calculate the current battery percentage
+            const currentBatteryPercentage = batteryBefore + percentageCharged;
+
+            // Ensure battery percentage does not exceed 100%
+            const adjustedBatteryPercentage = Math.min(currentBatteryPercentage, 100);
+
+            // Step 3: Calculate remaining energy required to reach 100%
+            const remainingEnergy = batteryCapacity * ((100 - adjustedBatteryPercentage) / 100);
+
+            // Step 4: Calculate remaining time required to fully charge the battery
+            const remainingTimeHours = remainingEnergy / power;
+            const remainingTimeMinutes = remainingTimeHours * 60;
+
+            // Convert remaining time to hours and minutes
+            const hours = Math.floor(remainingTimeMinutes / 60);
+            const minutes = Math.round(remainingTimeMinutes % 60);
+
+            // Step 5: Calculate exact time when charging will be completed
+            const currentTime = new Date();
+            const completionTime = new Date(currentTime.getTime() + remainingTimeMinutes * 60000);
+
+            // Format output
+            const completionTimeString = completionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const completionDateString = completionTime.toLocaleDateString();
+
+            // Display output
+            document.getElementById('output').innerHTML = `
+                <p>Current Battery Percentage: ${adjustedBatteryPercentage.toFixed(2)}%</p>
+                <p>Remaining Time: ${hours} hours and ${minutes} minutes</p>
+                <p>Estimated Completion Time: ${completionTimeString}</p>
+            `;
+        }
+    </script>
+</body>
+</html>
