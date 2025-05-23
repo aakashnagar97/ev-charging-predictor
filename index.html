@@ -1,126 +1,352 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Charging Predictor</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TVS iQube Charge Estimator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #2196F3, #03A9F4);
-            color: white;
-            text-align: center;
-            padding: 20px;
-            margin: 0;
+      /* Optional: Define custom scrollbar for better aesthetics if needed */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+
+      /* Animation for results section */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
         }
-        .container {
-            max-width: 400px;
-            margin: auto;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
-        input[type="number"] {
-            width: 95%;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border: none;
-            outline: none;
-            font-size: 16px;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            background: #0288D1;
-            border: none;
-            border-radius: 5px;
-            font-size: 18px;
-            font-weight: bold;
-            color: white;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #0277BD;
-        }
-        .output {
-            margin-top: 20px;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 5px;
-        }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      .battery-visualizer {
+        width: 100%;
+        height: 2rem;
+        background-color: rgb(55, 65, 81);
+        border-radius: 9999px;
+        border: 2px solid rgb(75, 85, 99);
+        overflow: hidden;
+        position: relative;
+        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+      }
+
+      .battery-level {
+        height: 100%;
+        border-radius: 9999px;
+        transition: all 500ms ease-out;
+      }
+
+      .battery-text {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: white;
+        mix-blend-mode: difference;
+      }
     </style>
-</head>
-<body>
-    <h1>iQube Charging Time Predictor</h1>
-    <div class="container">
-        <label for="battery-before">Battery % Before Charging:</label>
-        <input type="number" id="battery-before" min="0" max="100" placeholder="">
-        
-        <label for="energy-consumed">Energy Consumed (kWh):</label>
-        <input type="number" id="energy-consumed" min="0" step="0.01" placeholder="">
+    <script type="importmap">
+      {
+        "imports": {
+          "react/": "https://esm.sh/react@^19.1.0/",
+          "react": "https://esm.sh/react@^19.1.0",
+          "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+          "@heroicons/react/": "https://esm.sh/@heroicons/react@^2.2.0/"
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-gradient-to-br from-gray-900 to-gray-800 text-white min-h-screen">
+    <div class="min-h-screen flex flex-col items-center justify-center p-4">
+      <div class="w-full max-w-2xl bg-gray-800 shadow-2xl rounded-lg p-6 md:p-10">
+        <header class="text-center mb-8">
+          <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">TVS iQube Charge Estimator</h1>
+          <p class="text-gray-400 mt-2">Total Battery Capacity: 3.4 kWh</p>
+        </header>
 
-        <button onclick="calculateCharging()">Predict Charging Status</button>
+        <section class="mb-8 p-6 bg-gray-700/50 rounded-lg shadow-md">
+          <h2 class="text-2xl font-semibold text-gray-200 mb-6 border-b border-gray-600 pb-2">Initial Setup</h2>
 
-        <div class="output" id="output"></div>
+          <div class="mb-6">
+            <label for="initialBatteryPercent" class="block text-sm font-medium text-gray-300 mb-1">
+              Initial Battery % (when charger connected)
+              <span class="ml-1 text-gray-500 cursor-help" title="Enter the scooter's battery percentage when you first connect the charger.">(?)</span>
+            </label>
+            <div class="flex items-center">
+              <input
+                type="number"
+                id="initialBatteryPercent"
+                placeholder="e.g., 20"
+                min="0"
+                max="100"
+                step="0.1"
+                class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-100 placeholder-gray-500"
+              />
+              <span class="ml-3 text-gray-400 whitespace-nowrap">%</span>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <label for="chargingLimit" class="block text-sm font-medium text-gray-300 mb-1">
+              Charging Limit %
+              <span class="ml-1 text-gray-500 cursor-help" title="Set the target battery percentage for charging (default: 100%)">(?)</span>
+            </label>
+            <div class="flex items-center">
+              <input
+                type="number"
+                id="chargingLimit"
+                value="100"
+                placeholder="e.g., 90"
+                min="0"
+                max="100"
+                step="1"
+                class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-100 placeholder-gray-500"
+              />
+              <span class="ml-3 text-gray-400 whitespace-nowrap">%</span>
+            </div>
+          </div>
+
+          <p class="text-sm text-gray-400 mb-4">Using fixed charger power: 0.65 kW</p>
+
+          <button
+            onclick="calculateCharging(false)"
+            class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors duration-150"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 -ml-1" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M11.983 1.907a.75.75 0 00-1.292-.657l-8.5 9.5A.75.75 0 002.75 12h6.572l-1.305 6.093a.75.75 0 001.292.657l8.5-9.5A.75.75 0 0017.25 8h-6.572l1.305-6.093z" />
+            </svg>
+            Estimate Charging Time
+          </button>
+        </section>
+
+        <div id="error" class="my-6 p-4 bg-red-800/50 border border-red-700 text-red-300 rounded-md flex items-center hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span id="errorText"></span>
+        </div>
+
+        <section id="result" class="my-8 p-6 bg-gray-700/50 rounded-lg shadow-md animate-fadeIn hidden">
+          <h2 id="resultTitle" class="text-2xl font-semibold text-gray-200 mb-6 border-b border-gray-600 pb-2">Initial Estimation</h2>
+
+          <div class="mb-6">
+            <p class="text-lg text-gray-300 mb-2">Current Estimated Battery Level:</p>
+            <div class="battery-visualizer">
+              <div id="batteryLevel" class="battery-level bg-green-500" style="width: 0%"></div>
+              <div id="batteryText" class="battery-text">0%</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-gray-700 p-4 rounded-lg shadow">
+              <div class="flex items-center text-green-400 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    d="M11.983 1.907a.75.75 0 00-1.292-.657l-8.5 9.5A.75.75 0 002.75 12h6.572l-1.305 6.093a.75.75 0 001.292.657l8.5-9.5A.75.75 0 0017.25 8h-6.572l1.305-6.093z"
+                  />
+                </svg>
+                <h3 class="text-md font-semibold">Energy to Target</h3>
+              </div>
+              <p id="energyNeeded" class="text-2xl font-bold text-gray-100">0.000 kWh</p>
+            </div>
+            <div class="bg-gray-700 p-4 rounded-lg shadow">
+              <div class="flex items-center text-blue-400 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <h3 class="text-md font-semibold">Est. Time to Target</h3>
+              </div>
+              <p id="timeToTarget" class="text-2xl font-bold text-gray-100">0 hours and 0 minutes</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-700 p-4 rounded-lg shadow mb-8">
+            <div class="flex items-center text-purple-400 mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <h3 class="text-md font-semibold">Estimated Completion Time</h3>
+            </div>
+            <p id="completionTime" class="text-2xl font-bold text-gray-100">--:-- --</p>
+          </div>
+
+          <div class="mt-8 pt-6 border-t border-gray-600">
+            <h3 class="text-xl font-semibold text-gray-200 mb-4">Recalculate with Smart Plug Data</h3>
+            <div class="mb-6">
+              <label for="energyConsumed" class="block text-sm font-medium text-gray-300 mb-1">
+                Energy Consumed (from Smart Plug since charging started)
+                <span
+                  class="ml-1 text-gray-500 cursor-help"
+                  title="Enter the total energy your smart plug has reported consumed since charging began with the initial battery percentage entered above."
+                  >(?)</span
+                >
+              </label>
+              <div class="flex items-center">
+                <input
+                  type="number"
+                  id="energyConsumed"
+                  placeholder="e.g., 1.0"
+                  min="0"
+                  step="0.01"
+                  class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-100 placeholder-gray-500"
+                />
+                <span class="ml-3 text-gray-400 whitespace-nowrap">kWh</span>
+              </div>
+            </div>
+            <button
+              onclick="calculateCharging(true)"
+              class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors duration-150"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 -ml-1" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M11.983 1.907a.75.75 0 00-1.292-.657l-8.5 9.5A.75.75 0 002.75 12h6.572l-1.305 6.093a.75.75 0 001.292.657l8.5-9.5A.75.75 0 0017.25 8h-6.572l1.305-6.093z" />
+              </svg>
+              Recalculate Time
+            </button>
+          </div>
+        </section>
+      </div>
+      <footer class="text-center mt-12 pb-6">
+        <p class="text-sm text-gray-500">This estimator provides approximate values. Actual charging times may vary.</p>
+      </footer>
     </div>
 
     <script>
-        function calculateCharging() {
-            // Input values
-            const batteryBefore = parseFloat(document.getElementById('battery-before').value);
-            const energyConsumed = parseFloat(document.getElementById('energy-consumed').value) || 0.000001;
-            const power = 0.65; // Charger power in kW
-            const batteryCapacity = 3.4; // kWh
+      const TOTAL_BATTERY_CAPACITY_KWH = 3.4;
+      const CHARGER_POWER_KW = 0.65;
 
-            // Check for valid inputs
-            if (isNaN(batteryBefore) || batteryBefore < 0 || batteryBefore > 100) {
-                alert("Please enter a valid battery percentage between 0 and 100.");
-                return;
-            }
+      function showError(message) {
+        const errorDiv = document.getElementById("error");
+        const errorText = document.getElementById("errorText");
+        errorText.textContent = message;
+        errorDiv.classList.remove("hidden");
+      }
 
-            if (isNaN(energyConsumed) || energyConsumed < 0) {
-                alert("Please enter a valid energy consumed value.");
-                return;
-            }
+      function hideError() {
+        const errorDiv = document.getElementById("error");
+        errorDiv.classList.add("hidden");
+      }
 
-            // Step 1: Calculate how much battery percentage has been charged so far
-            const energyNeededFor20Percent = batteryCapacity * 0.2; // Energy needed for 20% charge
-            const percentageCharged = (energyConsumed / energyNeededFor20Percent) * 20; // Percentage charged
-
-            // Step 2: Calculate the current battery percentage
-            const currentBatteryPercentage = batteryBefore + percentageCharged;
-
-            // Ensure battery percentage does not exceed 100%
-            const adjustedBatteryPercentage = Math.min(currentBatteryPercentage, 100);
-
-            // Step 3: Calculate remaining energy required to reach 100%
-            const remainingEnergy = batteryCapacity * ((100 - adjustedBatteryPercentage) / 100);
-
-            // Step 4: Calculate remaining time required to fully charge the battery
-            const remainingTimeHours = remainingEnergy / power;
-            const remainingTimeMinutes = remainingTimeHours * 60;
-
-            // Convert remaining time to hours and minutes
-            const hours = Math.floor(remainingTimeMinutes / 60);
-            const minutes = Math.round(remainingTimeMinutes % 60);
-
-            // Step 5: Calculate exact time when charging will be completed
-            const currentTime = new Date();
-            const completionTime = new Date(currentTime.getTime() + remainingTimeMinutes * 60000);
-
-            // Format output
-            const completionTimeString = completionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            const completionDateString = completionTime.toLocaleDateString();
-
-            // Display output
-            document.getElementById('output').innerHTML = `
-                <p>Current Battery Percentage: ${adjustedBatteryPercentage.toFixed(2)}%</p>
-                <p>Remaining Time: ${hours} hours and ${minutes} minutes</p>
-                <p>Estimated Completion Time: ${completionTimeString}</p>
-            `;
+      function formatDuration(totalHours) {
+        if (totalHours < 0) totalHours = 0;
+        const hours = Math.floor(totalHours);
+        const minutes = Math.round((totalHours - hours) * 60);
+        if (hours === 0 && minutes === 0) return "Fully Charged";
+        let durationStr = "";
+        if (hours > 0) {
+          durationStr += `${hours} hour${hours > 1 ? "s" : ""} `;
         }
+        if (minutes > 0) {
+          durationStr += `${minutes} minute${minutes > 1 ? "s" : ""}`;
+        }
+        return durationStr.trim() || "Less than a minute";
+      }
+
+      function updateBatteryVisualizer(percentage) {
+        const batteryLevel = document.getElementById("batteryLevel");
+        const batteryText = document.getElementById("batteryText");
+
+        let bgColor = "bg-green-500";
+        if (percentage < 20) {
+          bgColor = "bg-red-500";
+        } else if (percentage < 50) {
+          bgColor = "bg-yellow-500";
+        }
+
+        batteryLevel.className = `battery-level ${bgColor}`;
+        batteryLevel.style.width = `${percentage}%`;
+        batteryText.textContent = `${percentage.toFixed(1)}%`;
+      }
+
+      function calculateCharging(isRecalc) {
+        hideError();
+
+        const initialBatteryPercent = parseFloat(document.getElementById("initialBatteryPercent").value);
+        const chargingLimit = parseFloat(document.getElementById("chargingLimit").value);
+
+        if (isNaN(initialBatteryPercent) || initialBatteryPercent < 0 || initialBatteryPercent > 100) {
+          showError("Initial battery percentage must be between 0 and 100.");
+          return;
+        }
+
+        if (isNaN(chargingLimit) || chargingLimit < 0 || chargingLimit > 100) {
+          showError("Charging limit must be between 0 and 100.");
+          return;
+        }
+
+        let currentBatteryPercentage, remainingEnergy;
+
+        if (isRecalc) {
+          const energyConsumed = parseFloat(document.getElementById("energyConsumed").value);
+          if (isNaN(energyConsumed) || energyConsumed < 0) {
+            showError("Energy consumed must be a non-negative number (kWh).");
+            return;
+          }
+
+          // Calculate how much battery percentage has been charged
+          const energyNeededFor20Percent = TOTAL_BATTERY_CAPACITY_KWH * 0.2;
+          const percentageCharged = (energyConsumed / energyNeededFor20Percent) * 20;
+
+          // Calculate current battery percentage
+          currentBatteryPercentage = initialBatteryPercent + percentageCharged;
+          currentBatteryPercentage = Math.min(currentBatteryPercentage, chargingLimit);
+        } else {
+          currentBatteryPercentage = initialBatteryPercent;
+        }
+
+        // Calculate remaining energy and time
+        remainingEnergy = TOTAL_BATTERY_CAPACITY_KWH * ((chargingLimit - currentBatteryPercentage) / 100);
+        const remainingTimeHours = remainingEnergy / CHARGER_POWER_KW;
+
+        // Calculate completion time
+        const completionTime = new Date(Date.now() + remainingTimeHours * 60 * 60 * 1000);
+
+        // Update UI
+        document.getElementById("result").classList.remove("hidden");
+        document.getElementById("resultTitle").textContent = isRecalc ? "Updated Estimation" : "Initial Estimation";
+        updateBatteryVisualizer(currentBatteryPercentage);
+        document.getElementById("energyNeeded").textContent = `${remainingEnergy.toFixed(3)} kWh`;
+        document.getElementById("timeToTarget").textContent = formatDuration(remainingTimeHours);
+        document.getElementById("completionTime").textContent = completionTime.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      }
+
+      // Initialize charging limit input with default value
+      document.getElementById("chargingLimit").value = "100";
     </script>
-</body>
+  </body>
 </html>
